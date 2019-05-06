@@ -1,0 +1,54 @@
+language: python
+dist: xenial
+
+python:
+  - "3.5"
+  - "3.6"
+  - "3.7"
+
+cache: pip
+
+install:
+  - pip install tox-travis
+
+script:
+  - travis_wait 120 tox
+
+after_success:
+  - pip install codecov && codecov
+
+jobs:
+  include:
+    - stage: "Deploy - Docker Hub"
+      if: branch = master AND type != pull_request
+      language: generic
+      before_install: skip
+      install: skip
+      services:
+        - docker
+      script:
+        # test docker build
+        - docker build . -t cmlapsu/statdp
+        - docker run -it cmlapsu/statdp python -c "import statdp"
+      after_success:
+        - echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
+        - docker push cmlapsu/shadowdp:latest
+
+    - stage: "Deploy - Github"
+      if: branch = master AND type != pull_request
+      language: generic
+      before_install: skip
+      install: skip
+      # cannot use deploy: pages since it does not support custom commit message yet
+      script:
+        - rm -rf .git
+        - git init
+        - git config user.name "Yuxin (Ryan) Wang"
+        - git config user.email "ryanwang.cs@gmail.com"
+        - git add .
+        - git commit -m "Release of StatDP."
+        - git remote add origin https://ryanwanggit:$GITHUB_TOKEN@github.com/cmla-psu/statdp.git
+        - git push -u --force origin master
+
+notifications:
+  email: false
